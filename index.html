@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 기반 공공시설 예방정비 시스템 | 시연 데모</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy: #0b2a5b;
+      --navy-2: #143a75;
+      --navy-soft: #e8eef8;
+      --bg: #f4f7fb;
+      --white: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d7e0ee;
+      --danger: #dc2626;
+      --warn: #ea580c;
+      --ok: #16a34a;
+      --shadow: 0 8px 24px rgba(11, 42, 91, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: linear-gradient(180deg, var(--navy) 0%, #071c3d 100%);
+      color: #fff;
+      padding: 24px 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .brand { padding: 8px 12px 24px; border-bottom: 1px solid rgba(255,255,255,.12); margin-bottom: 16px; }
+    .brand h1 { margin: 0; font-size: 17px; line-height: 1.4; }
+    .brand p { margin: 8px 0 0; font-size: 12px; opacity: .75; }
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      color: #dbe7ff;
+      padding: 12px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .nav-btn:hover, .nav-btn.active { background: rgba(255,255,255,.12); color: #fff; }
+    .main { padding: 20px 24px 40px; }
+    .banner {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+      padding: 10px 14px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .topbar h2 { margin: 0; color: var(--navy); font-size: 24px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--navy-soft);
+      color: var(--navy);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .page { display: none; }
+    .page.active { display: block; }
+    .grid { display: grid; gap: 14px; }
+    .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 28px; font-weight: 800; color: var(--navy); margin-top: 8px; }
+    .kpi .hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .charts { grid-template-columns: 1.2fr 1fr; }
+    .charts-3 { grid-template-columns: 1fr 1fr 1fr; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--navy); font-size: 13px; background: #f8fbff; }
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tag.ok { background: #dcfce7; color: var(--ok); }
+    .tag.warn { background: #ffedd5; color: var(--warn); }
+    .tag.danger { background: #fee2e2; color: var(--danger); }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    input, select, button.action {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+    }
+    button.action {
+      background: var(--navy);
+      color: #fff;
+      border: 0;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button.action.secondary { background: #fff; color: var(--navy); border: 1px solid var(--navy); }
+    button.action:disabled { opacity: .5; cursor: not-allowed; }
+    .muted { color: var(--muted); }
+    .split { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
+    .score-big { font-size: 42px; font-weight: 800; }
+    .bar {
+      height: 10px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .bar > span { display: block; height: 100%; background: var(--navy); }
+    .warn-box {
+      border-left: 4px solid var(--danger);
+      background: #fff5f5;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .ok-box {
+      border-left: 4px solid var(--ok);
+      background: #f0fdf4;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .steps { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .step-pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .step-pill.on { background: var(--navy); color: #fff; }
+    .step-pill.done { background: #bfdbfe; color: var(--navy); }
+    .disclaimer {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      color: #475569;
+    }
+    .footer-note { margin-top: 18px; font-size: 12px; color: var(--muted); }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: relative; height: auto; }
+      .kpi-grid, .charts, .charts-3, .split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>AI 공공시설<br/>예방정비 시스템</h1>
+        <p>의정부도시공사 AI 공모전<br/>시연용 데모</p>
+      </div>
+      <button class="nav-btn active" data-page="dashboard">1. 종합 대시보드</button>
+      <button class="nav-btn" data-page="facilities">2. 시설물 관리</button>
+      <button class="nav-btn" data-page="history">3. 점검·고장 이력</button>
+      <button class="nav-btn" data-page="risk">4. AI 위험 분석</button>
+      <button class="nav-btn" data-page="maintain">5. 예방정비 추천</button>
+      <button class="nav-btn" data-page="report">6. 분석 보고서</button>
+      <button class="nav-btn" data-page="demo">7. 공모전 시연</button>
+    </aside>
+
+    <main class="main">
+      <div class="banner">⚠ 본 화면의 모든 수치·시설·분석 결과는 <strong>가상 시연 데이터</strong>입니다. 실제 의정부도시공사 운영 현황이 아닙니다.</div>
+
+      <!-- 1. Dashboard -->
+      <section id="dashboard" class="page active">
+        <div class="topbar">
+          <h2>종합 대시보드</h2>
+          <span class="badge">기준일: 2026-11-08 · 가상데이터</span>
+        </div>
+        <div class="grid kpi-grid">
+          <div class="card kpi"><div class="label">전체 등록 시설</div><div class="value">36</div><div class="hint">공영주차·체육·건축·설비</div></div>
+          <div class="card kpi"><div class="label">정상 시설</div><div class="value" style="color:var(--ok)">21</div><div class="hint">위험도 0~39</div></div>
+          <div class="card kpi"><div class="label">주의 시설</div><div class="value" style="color:var(--warn)">10</div><div class="hint">위험도 40~69</div></div>
+          <div class="card kpi"><div class="label">위험 시설</div><div class="value" style="color:var(--danger)">5</div><div class="hint">위험도 70~100</div></div>
+          <div class="card kpi"><div class="label">최근 30일 고장</div><div class="value">18</div><div class="hint">전월 대비 +4</div></div>
+          <div class="card kpi"><div class="label">90일 반복고장 시설</div><div class="value">4</div><div class="hint">3회 이상 동일시설</div></div>
+          <div class="card kpi"><div class="label">누적 수리비용</div><div class="value">₩48.2M</div><div class="hint">최근 12개월</div></div>
+          <div class="card kpi"><div class="label">점검 예정 시설</div><div class="value">7</div><div class="hint">이번 주 권장</div></div>
+        </div>
+        <div class="grid charts" style="margin-top:14px">
+          <div class="card"><h3>월별 고장 발생 추이</h3><canvas id="chartMonthly" height="140"></canvas></div>
+          <div class="card"><h3>시설별 위험도 분포</h3><canvas id="chartRiskDist" height="140"></canvas></div>
+        </div>
+        <div class="grid charts" style="margin-top:14px">
+          <div class="card">
+            <h3>위험도 상위 시설</h3>
+            <table>
+              <thead><tr><th>시설명</th><th>유형</th><th>위험도</th><th>등급</th></tr></thead>
+              <tbody id="topRiskTable"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>반복 고장 TOP 5</h3>
+            <table>
+              <thead><tr><th>시설명</th><th>90일 고장</th><th>주요유형</th></tr></thead>
+              <tbody id="repeatTopTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Facilities -->
+      <section id="facilities" class="page">
+        <div class="topbar">
+          <h2>시설물 관리</h2>
+          <span class="badge">가상 시설 36개</span>
+        </div>
+        <div class="filters">
+          <input id="facilitySearch" placeholder="시설명 검색" />
+          <select id="facilityTypeFilter">
+            <option value="전체">전체 유형</option>
+            <option>공영주차장</option>
+            <option>체육시설</option>
+            <option>공공건축물</option>
+            <option>전기설비</option>
+            <option>기계설비</option>
+            <option>배수설비</option>
+          </select>
+        </div>
+        <div class="card">
+          <table>
+            <thead>
+              <tr><th>시설 ID</th><th>시설명</th><th>유형</th><th>사용연수</th><th>중요도</th><th>상태</th><th>위험도</th></tr>
+            </thead>
+            <tbody id="facilityTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 3. History -->
+      <section id="history" class="page">
+        <div class="topbar">
+          <h2>점검·고장 이력 관리</h2>
+          <span class="badge">최근 12개월</span>
+        </div>
+        <div class="grid charts">
+          <div class="card">
+            <h3>최근 고장 이력</h3>
+            <table>
+              <thead><tr><th>일자</th><th>시설</th><th>유형</th><th>긴급</th><th>수리비</th></tr></thead>
+              <tbody id="failureTable"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>최근 점검 이력</h3>
+            <table>
+              <thead><tr><th>일자</th><th>시설</th><th>결과</th><th>이상</th><th>담당</th></tr></thead>
+              <tbody id="inspectTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>민원 이력 (요약)</h3>
+          <table>
+            <thead><tr><th>접수일</th><th>시설</th><th>유형</th><th>상태</th></tr></thead>
+            <tbody id="complaintTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 4. Risk -->
+      <section id="risk" class="page">
+        <div class="topbar">
+          <h2>AI 위험 분석</h2>
+          <button class="action" id="runRiskBtn">위험도 분석 실행</button>
+        </div>
+        <div class="disclaimer">
+          위험도 점수는 실제 고장 확률이 아니라 <strong>상대적 정비 우선순위 지표</strong>입니다.
+          시범사업용 가중치(고장빈도 30% · 반복고장 25% · 점검이상 20% · 노후도 15% · 민원 10%)를 사용합니다.
+        </div>
+        <div class="split" style="margin-top:14px">
+          <div class="card">
+            <h3>시설별 위험도 목록</h3>
+            <table>
+              <thead><tr><th>시설명</th><th>점수</th><th>등급</th><th>신뢰도</th><th>주요근거</th></tr></thead>
+              <tbody id="riskTable"></tbody>
+            </table>
+          </div>
+          <div class="card" id="riskDetail">
+            <h3>산정 근거</h3>
+            <p class="muted">시설을 선택하면 세부 점수가 표시됩니다.</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>규칙 기반 경고 / 이상 징후</h3>
+          <div id="alertList"></div>
+          <p class="muted" style="margin-top:8px">※ Isolation Forest 등 ML 이상은 데이터 부족으로 이번 시연에서는 규칙 기반 경고만 표시합니다.</p>
+        </div>
+      </section>
+
+      <!-- 5. Maintenance -->
+      <section id="maintain" class="page">
+        <div class="topbar">
+          <h2>예방정비 추천</h2>
+          <span class="badge">의사결정 지원용</span>
+        </div>
+        <div class="filters">
+          <select id="maintainSelect"></select>
+          <button class="action" id="genPlanBtn">정비계획에 추가</button>
+        </div>
+        <div class="split">
+          <div class="card" id="recommendCard"></div>
+          <div class="card">
+            <h3>예방정비 계획</h3>
+            <table>
+              <thead><tr><th>시설명</th><th>위험도</th><th>예정일</th><th>상태</th><th>변경</th></tr></thead>
+              <tbody id="planTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="disclaimer">
+          본 결과는 시설관리 의사결정 지원용이며, 실제 정비 여부는 담당자의 현장 확인과 관련 기준에 따라 결정해야 합니다.
+        </div>
+      </section>
+
+      <!-- 6. Report -->
+      <section id="report" class="page">
+        <div class="topbar">
+          <h2>분석 보고서</h2>
+          <button class="action" id="downloadReportBtn">보고서 다운로드(.html)</button>
+        </div>
+        <div class="card" id="reportPreview">
+          <h3>AI 기반 공공시설 예방정비 분석 보고서</h3>
+          <p class="muted">작성일 2026-11-08 · 가상 시연 데이터 기반</p>
+          <ol>
+            <li><strong>분석 개요</strong> — 시설 36개, 최근 12개월 점검·고장·민원 자료를 통합 분석</li>
+            <li><strong>전체 시설 현황</strong> — 정상 21 / 주의 10 / 위험 5</li>
+            <li><strong>시설별 위험도 분석</strong> — 상위 위험시설 5개 집중 관리 필요</li>
+            <li><strong>반복 고장 발생 현황</strong> — 배수펌프·주차관제기 중심 반복 발생</li>
+            <li><strong>주요 위험시설</strong> — 배수펌프 A-01(82), 주차관제기 P-07(76) 등</li>
+            <li><strong>예방정비 추천사항</strong> — 정밀점검·부품마모 확인·제어계통 점검</li>
+            <li><strong>정비 우선순위</strong> — 위험등급 시설 우선, 이후 주의등급</li>
+            <li><strong>기대효과 및 향후 관리방안</strong> — 사후대응에서 선제 정비로 전환, 데이터 축적 후 예측모형 고도화</li>
+          </ol>
+          <p class="muted">※ 비용 절감액·고장 감소율 등 실측 불가 수치는 포함하지 않았습니다.</p>
+        </div>
+      </section>
+
+      <!-- 7. Demo flow -->
+      <section id="demo" class="page">
+        <div class="topbar">
+          <h2>공모전 시연 (5단계)</h2>
+          <span class="badge">약 3~5분</span>
+        </div>
+        <div class="steps" id="demoSteps">
+          <div class="step-pill on" data-step="1">1. 문제 확인</div>
+          <div class="step-pill" data-step="2">2. AI 분석</div>
+          <div class="step-pill" data-step="3">3. 위험시설</div>
+          <div class="step-pill" data-step="4">4. 예방정비</div>
+          <div class="step-pill" data-step="5">5. 보고서</div>
+        </div>
+        <div class="card" id="demoPanel"></div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button class="action secondary" id="demoPrev">이전</button>
+          <button class="action" id="demoNext">다음 단계</button>
+        </div>
+      </section>
+
+      <p class="footer-note">로컬 시연용 정적 데모 · 외부 서버 전송 없음 · 개인정보 미수집</p>
+    </main>
+  </div>
+
+<script>
+const FACILITIES = [
+  {id:'F-DP-01', name:'배수펌프 A-01', type:'배수설비', years:14, importance:'상', status:'운영', risk:82, conf:'높음', reason:'90일 고장4 · 동일유형3 · 점검이상2', scores:{fail:90,repeat:95,insp:80,age:70,comp:60}},
+  {id:'F-PK-07', name:'주차관제기 P-07', type:'공영주차장', years:9, importance:'상', status:'운영', risk:76, conf:'높음', reason:'고장빈도 증가 · 민원 다수', scores:{fail:85,repeat:70,insp:65,age:55,comp:88}},
+  {id:'F-EL-03', name:'전기설비 E-03', type:'전기설비', years:18, importance:'상', status:'점검필요', risk:71, conf:'보통', reason:'노후도 높음 · 점검이상 반복', scores:{fail:55,repeat:40,insp:78,age:92,comp:45}},
+  {id:'F-MC-02', name:'기계설비 M-02', type:'기계설비', years:12, importance:'중', status:'운영', risk:68, conf:'보통', reason:'수리비 증가 · 점검주의', scores:{fail:60,repeat:55,insp:70,age:65,comp:40}},
+  {id:'F-SP-01', name:'체육관 공조기 S-01', type:'체육시설', years:11, importance:'중', status:'운영', risk:64, conf:'보통', reason:'계절성 고장 · 민원', scores:{fail:58,repeat:50,insp:60,age:60,comp:70}},
+  {id:'F-BD-04', name:'공공청사 승강기 B-04', type:'공공건축물', years:15, importance:'상', status:'운영', risk:58, conf:'보통', reason:'간헐적 고장', scores:{fail:50,repeat:45,insp:55,age:75,comp:35}},
+  {id:'F-PK-02', name:'공영주차장 조명 P-02', type:'공영주차장', years:7, importance:'중', status:'운영', risk:47, conf:'보통', reason:'부분 교체 이력', scores:{fail:40,repeat:30,insp:45,age:40,comp:50}},
+  {id:'F-DP-05', name:'배수펌프 A-05', type:'배수설비', years:6, importance:'중', status:'운영', risk:42, conf:'보통', reason:'최근 이상 징후 1건', scores:{fail:35,repeat:20,insp:50,age:35,comp:30}},
+  {id:'F-EL-09', name:'전기설비 E-09', type:'전기설비', years:5, importance:'중', status:'운영', risk:28, conf:'높음', reason:'정상 관리', scores:{fail:15,repeat:10,insp:20,age:30,comp:15}},
+  {id:'F-SP-08', name:'체육시설 보일러 S-08', type:'체육시설', years:4, importance:'중', status:'운영', risk:22, conf:'높음', reason:'정상 운영', scores:{fail:10,repeat:5,insp:15,age:25,comp:10}},
+  {id:'F-BD-11', name:'공공건축물 옥상방수 B-11', type:'공공건축물', years:8, importance:'하', status:'운영', risk:19, conf:'보통', reason:'특이사항 없음', scores:{fail:8,repeat:5,insp:18,age:40,comp:5}},
+  {id:'F-MC-12', name:'기계설비 M-12', type:'기계설비', years:3, importance:'하', status:'운영', risk:15, conf:'높음', reason:'정상', scores:{fail:5,repeat:0,insp:10,age:15,comp:5}},
+  {id:'F-XX-99', name:'미확인 부대설비 X-99', type:'기계설비', years:null, importance:'중', status:'자료부족', risk:null, conf:'부족', reason:'점검·고장 데이터 부족', scores:null},
+];
+
+// pad to feel like 36 facilities
+const EXTRA_TYPES = ['공영주차장','체육시설','공공건축물','전기설비','기계설비','배수설비'];
+for (let i = FACILITIES.length; i < 36; i++) {
+  const t = EXTRA_TYPES[i % EXTRA_TYPES.length];
+  const r = 12 + ((i * 7) % 35);
+  FACILITIES.push({
+    id: `F-GEN-${String(i+1).padStart(2,'0')}`,
+    name: `${t} 시연기기 ${i+1}`,
+    type: t,
+    years: 3 + (i % 12),
+    importance: ['상','중','하'][i%3],
+    status: '운영',
+    risk: r,
+    conf: '보통',
+    reason: r > 30 ? '경미한 이상 이력' : '정상 관리',
+    scores: {fail:r-5,repeat:Math.max(0,r-15),insp:r-8,age:20+(i%40),comp:Math.max(0,r-12)}
+  });
+}
+
+const FAILURES = [
+  {date:'2026-10-28', facility:'배수펌프 A-01', type:'작동불량', urgent:'Y', cost:'1,250,000'},
+  {date:'2026-10-12', facility:'배수펌프 A-01', type:'작동불량', urgent:'Y', cost:'980,000'},
+  {date:'2026-09-21', facility:'배수펌프 A-01', type:'누수', urgent:'N', cost:'420,000'},
+  {date:'2026-09-05', facility:'배수펌프 A-01', type:'작동불량', urgent:'Y', cost:'760,000'},
+  {date:'2026-10-30', facility:'주차관제기 P-07', type:'인식오류', urgent:'N', cost:'350,000'},
+  {date:'2026-10-08', facility:'주차관제기 P-07', type:'차단기오작동', urgent:'Y', cost:'610,000'},
+  {date:'2026-09-18', facility:'주차관제기 P-07', type:'인식오류', urgent:'N', cost:'280,000'},
+  {date:'2026-10-15', facility:'전기설비 E-03', type:'차단기트립', urgent:'Y', cost:'890,000'},
+  {date:'2026-08-22', facility:'기계설비 M-02', type:'베어링소음', urgent:'N', cost:'540,000'},
+  {date:'2026-07-11', facility:'체육관 공조기 S-01', type:'냉각불량', urgent:'N', cost:'720,000'},
+];
+
+const INSPECTIONS = [
+  {date:'2026-11-01', facility:'배수펌프 A-01', result:'이상', anomaly:'Y', person:'김○○'},
+  {date:'2026-10-02', facility:'배수펌프 A-01', result:'이상', anomaly:'Y', person:'이○○'},
+  {date:'2026-09-03', facility:'배수펌프 A-01', result:'주의', anomaly:'Y', person:'김○○'},
+  {date:'2026-10-20', facility:'전기설비 E-03', result:'이상', anomaly:'Y', person:'박○○'},
+  {date:'2026-09-15', facility:'전기설비 E-03', result:'주의', anomaly:'Y', person:'박○○'},
+  {date:'2026-10-25', facility:'주차관제기 P-07', result:'주의', anomaly:'Y', person:'최○○'},
+  {date:'2026-11-02', facility:'전기설비 E-09', result:'정상', anomaly:'N', person:'정○○'},
+  {date:'2026-10-18', facility:'기계설비 M-12', result:'정상', anomaly:'N', person:'한○○'},
+];
+
+const COMPLAINTS = [
+  {date:'2026-10-29', facility:'주차관제기 P-07', type:'출입지연', status:'처리중'},
+  {date:'2026-10-14', facility:'주차관제기 P-07', type:'오인식', status:'완료'},
+  {date:'2026-09-27', facility:'체육관 공조기 S-01', type:'냉방불량', status:'완료'},
+  {date:'2026-08-19', facility:'공공청사 승강기 B-04', type:'문닫힘지연', status:'완료'},
+];
+
+const PLANS = [
+  {name:'배수펌프 A-01', risk:82, date:'2026-11-12', status:'점검 필요'},
+  {name:'주차관제기 P-07', risk:76, date:'2026-11-14', status:'점검 예정'},
+  {name:'전기설비 E-03', risk:71, date:'2026-11-18', status:'조치 진행 중'},
+];
+
+const RECOMMEND = {
+  '배수펌프 A-01': {
+    risk:82,
+    factors:['반복적인 작동 불량','최근 고장 빈도 증가','점검 이상 기록 누적'],
+    actions:['펌프 작동 상태 및 이상 소음 확인','전원·제어계통 점검','주요 부품 마모 상태 확인','반복 고장 원인 분석','필요 시 전문업체 정밀점검 의뢰']
+  },
+  '주차관제기 P-07': {
+    risk:76,
+    factors:['인식오류 반복','민원 빈도 증가','고장 간격 단축'],
+    actions:['카메라·센서 정렬 점검','통신·제어보드 상태 확인','펌웨어/설정값 점검','출입로그와 오류패턴 대조','예비부품 확보 여부 확인']
+  },
+  '전기설비 E-03': {
+    risk:71,
+    factors:['사용연수 높음','점검 이상 반복','차단기 트립 이력'],
+    actions:['절연저항 측정','분전반·차단기 외관/발열 확인','접지상태 점검','노후 부품 교체 검토','정전 대비 비상전원 점검']
+  }
+};
+
+function gradeOf(risk) {
+  if (risk == null) return {text:'분석불가', cls:'warn'};
+  if (risk >= 70) return {text:'위험', cls:'danger'};
+  if (risk >= 40) return {text:'주의', cls:'warn'};
+  return {text:'정상', cls:'ok'};
+}
+
+function $(sel){ return document.querySelector(sel); }
+function $all(sel){ return [...document.querySelectorAll(sel)]; }
+
+function renderTables() {
+  const top = FACILITIES.filter(f=>f.risk!=null).sort((a,b)=>b.risk-a.risk).slice(0,5);
+  $('#topRiskTable').innerHTML = top.map(f=>{
+    const g = gradeOf(f.risk);
+    return `<tr><td>${f.name}</td><td>${f.type}</td><td>${f.risk}</td><td><span class="tag ${g.cls}">${g.text}</span></td></tr>`;
+  }).join('');
+
+  $('#repeatTopTable').innerHTML = `
+    <tr><td>배수펌프 A-01</td><td>4</td><td>작동불량</td></tr>
+    <tr><td>주차관제기 P-07</td><td>3</td><td>인식오류</td></tr>
+    <tr><td>전기설비 E-03</td><td>2</td><td>차단기트립</td></tr>
+    <tr><td>기계설비 M-02</td><td>2</td><td>베어링소음</td></tr>
+    <tr><td>체육관 공조기 S-01</td><td>2</td><td>냉각불량</td></tr>`;
+
+  renderFacilityTable();
+  $('#failureTable').innerHTML = FAILURES.map(r=>`<tr><td>${r.date}</td><td>${r.facility}</td><td>${r.type}</td><td>${r.urgent==='Y'?'<span class="tag danger">긴급</span>':'일반'}</td><td>₩${r.cost}</td></tr>`).join('');
+  $('#inspectTable').innerHTML = INSPECTIONS.map(r=>`<tr><td>${r.date}</td><td>${r.facility}</td><td>${r.result}</td><td>${r.anomaly==='Y'?'<span class="tag warn">이상</span>':'정상'}</td><td>${r.person}</td></tr>`).join('');
+  $('#complaintTable').innerHTML = COMPLAINTS.map(r=>`<tr><td>${r.date}</td><td>${r.facility}</td><td>${r.type}</td><td>${r.status}</td></tr>`).join('');
+
+  $('#riskTable').innerHTML = FACILITIES.filter(f=>f.risk!=null || f.conf==='부족').sort((a,b)=>(b.risk||0)-(a.risk||0)).slice(0,15).map(f=>{
+    const g = gradeOf(f.risk);
+    return `<tr data-id="${f.id}" style="cursor:pointer"><td>${f.name}</td><td>${f.risk ?? '-'}</td><td><span class="tag ${g.cls}">${g.text}</span></td><td>${f.conf}</td><td>${f.reason}</td></tr>`;
+  }).join('');
+
+  $('#alertList').innerHTML = `
+    <div class="warn-box"><strong>[위험] 배수펌프 A-01</strong><br/>최근 90일 고장 4건 · 동일유형 3건 · 최근 점검이상 2건<br/>→ 반복 고장에 따른 정밀점검 권고</div>
+    <div class="warn-box"><strong>[위험] 주차관제기 P-07</strong><br/>최근 고장 빈도가 이전 90일 대비 급증 · 민원 3건<br/>→ 센서/제어계통 집중 점검 권고</div>
+    <div class="warn-box"><strong>[주의] 전기설비 E-03</strong><br/>노후도 높음 · 점검 이상 반복<br/>→ 절연/차단기 상태 확인 권고</div>
+    <div class="ok-box"><strong>[정상] 전기설비 E-09 · 기계설비 M-12</strong><br/>특이 반복고장 없음 · 정기점검 유지</div>`;
+
+  const names = Object.keys(RECOMMEND);
+  $('#maintainSelect').innerHTML = names.map(n=>`<option>${n}</option>`).join('');
+  renderRecommend(names[0]);
+  renderPlans();
+}
+
+function renderFacilityTable() {
+  const q = ($('#facilitySearch').value || '').trim();
+  const t = $('#facilityTypeFilter').value;
+  const rows = FACILITIES.filter(f => (t==='전체' || f.type===t) && (!q || f.name.includes(q) || f.id.includes(q)));
+  $('#facilityTable').innerHTML = rows.map(f=>{
+    const g = gradeOf(f.risk);
+    return `<tr><td>${f.id}</td><td>${f.name}</td><td>${f.type}</td><td>${f.years ?? '자료없음'}</td><td>${f.importance}</td><td>${f.status}</td><td>${f.risk ?? '-'} <span class="tag ${g.cls}">${g.text}</span></td></tr>`;
+  }).join('');
+}
+
+function showRiskDetail(f) {
+  if (!f.scores) {
+    $('#riskDetail').innerHTML = `<h3>${f.name}</h3><p class="tag warn">분석 신뢰도 부족</p><p>점검·고장 데이터가 부족하여 위험도를 산정하지 않았습니다. 결측값을 정상으로 처리하지 않습니다.</p>`;
+    return;
+  }
+  const g = gradeOf(f.risk);
+  const s = f.scores;
+  $('#riskDetail').innerHTML = `
+    <h3>${f.name}</h3>
+    <div class="score-big" style="color:${g.cls==='danger'? 'var(--danger)': g.cls==='warn'? 'var(--warn)':'var(--ok)'}">${f.risk}<span style="font-size:16px">점</span></div>
+    <p><span class="tag ${g.cls}">${g.text}</span> · 신뢰도 ${f.conf}</p>
+    <p class="muted">위험도 = 고장 ${s.fail}×0.30 + 반복 ${s.repeat}×0.25 + 점검 ${s.insp}×0.20 + 노후 ${s.age}×0.15 + 민원 ${s.comp}×0.10</p>
+    ${[['고장 빈도',s.fail],['반복 고장',s.repeat],['점검 이상',s.insp],['노후도',s.age],['민원',s.comp]].map(([k,v])=>`
+      <div style="margin-top:10px"><div style="display:flex;justify-content:space-between"><span>${k}</span><strong>${v}</strong></div><div class="bar"><span style="width:${v}%"></span></div></div>`).join('')}
+    <p style="margin-top:12px">${f.reason}</p>`;
+}
+
+function renderRecommend(name) {
+  const r = RECOMMEND[name];
+  $('#recommendCard').innerHTML = `
+    <h3>시설: ${name}</h3>
+    <p>위험도: <strong style="color:var(--danger)">${r.risk}점</strong></p>
+    <p><strong>주요 위험요인</strong></p>
+    <ul>${r.factors.map(x=>`<li>${x}</li>`).join('')}</ul>
+    <p><strong>추천 조치</strong></p>
+    <ol>${r.actions.map(x=>`<li>${x}</li>`).join('')}</ol>`;
+}
+
+function renderPlans() {
+  const statuses = ['점검 필요','점검 예정','조치 진행 중','조치 완료'];
+  $('#planTable').innerHTML = PLANS.map((p,i)=>`
+    <tr>
+      <td>${p.name}</td><td>${p.risk}</td><td>${p.date}</td>
+      <td><span class="tag ${p.status.includes('완료')?'ok':p.status.includes('진행')?'warn':'danger'}">${p.status}</span></td>
+      <td><select data-plan="${i}">${statuses.map(s=>`<option ${s===p.status?'selected':''}>${s}</option>`).join('')}</select></td>
+    </tr>`).join('');
+  $all('#planTable select').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      PLANS[+e.target.dataset.plan].status = e.target.value;
+      renderPlans();
+    });
+  });
+}
+
+let charts = {};
+function initCharts() {
+  charts.monthly = new Chart($('#chartMonthly'), {
+    type: 'line',
+    data: {
+      labels: ['12월','1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월'],
+      datasets: [{label:'고장 건수', data:[9,8,7,10,11,12,14,13,15,16,18,12], borderColor:'#0b2a5b', backgroundColor:'rgba(11,42,91,.15)', fill:true, tension:.3}]
+    },
+    options: {plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+  charts.risk = new Chart($('#chartRiskDist'), {
+    type: 'doughnut',
+    data: {
+      labels:['정상','주의','위험'],
+      datasets:[{data:[21,10,5], backgroundColor:['#16a34a','#ea580c','#dc2626']}]
+    },
+    options:{plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function showPage(id) {
+  $all('.page').forEach(p=>p.classList.remove('active'));
+  $all('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $('#'+id).classList.add('active');
+  $(`.nav-btn[data-page="${id}"]`).classList.add('active');
+}
+
+// Demo flow
+let demoStep = 1;
+function renderDemo() {
+  $all('#demoSteps .step-pill').forEach(el=>{
+    const s = +el.dataset.step;
+    el.classList.toggle('on', s===demoStep);
+    el.classList.toggle('done', s<demoStep);
+  });
+  const panel = $('#demoPanel');
+  if (demoStep===1) {
+    panel.innerHTML = `<h3>1단계. 기존 시설관리 문제 확인</h3>
+      <div class="warn-box">배수펌프 A-01: 90일 내 고장 4건, 수리비 누적 약 341만원</div>
+      <div class="warn-box">주차관제기 P-07: 고장 간격 단축 + 민원 증가</div>
+      <p>사후 대응 중심 · 이력 분산 · 경험 의존 우선순위 → <strong>선제 정비 전환 필요</strong></p>
+      <button class="action secondary" onclick="showPage('history')">이력 화면 보기</button>`;
+  } else if (demoStep===2) {
+    panel.innerHTML = `<h3>2단계. AI 분석 실행</h3>
+      <p>아래 버튼을 누르면 시연용 위험도 산정 로직을 실행합니다.</p>
+      <button class="action" id="demoAnalyzeBtn">위험도 분석 시작</button>
+      <pre id="demoAnalyzeLog" style="margin-top:12px;background:#0b2a5b;color:#dbeafe;padding:12px;border-radius:10px;min-height:90px;white-space:pre-wrap"></pre>`;
+    $('#demoAnalyzeBtn').onclick = () => {
+      const log = $('#demoAnalyzeLog');
+      log.textContent = '분석 시작...\n시설 36개 로드\n가중치 적용 (0.30/0.25/0.20/0.15/0.10)\n반복고장·점검이상 규칙 탐지\n완료: 위험 5 · 주의 10 · 정상 21 · 신뢰도부족 1';
+    };
+  } else if (demoStep===3) {
+    panel.innerHTML = `<h3>3단계. 위험시설 탐지</h3>
+      <table><thead><tr><th>순위</th><th>시설</th><th>위험도</th><th>원인</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>배수펌프 A-01</td><td>82</td><td>반복 작동불량</td></tr>
+        <tr><td>2</td><td>주차관제기 P-07</td><td>76</td><td>인식오류·민원</td></tr>
+        <tr><td>3</td><td>전기설비 E-03</td><td>71</td><td>노후·점검이상</td></tr>
+      </tbody></table>
+      <button class="action secondary" style="margin-top:10px" onclick="showPage('risk')">위험 분석 화면 이동</button>`;
+  } else if (demoStep===4) {
+    panel.innerHTML = `<h3>4단계. 예방정비 추천</h3>
+      <p><strong>배수펌프 A-01</strong> 우선 권고</p>
+      <ol><li>작동상태·이상소음 확인</li><li>전원·제어계통 점검</li><li>부품 마모 확인</li><li>반복고장 원인 분석</li><li>전문업체 정밀점검 검토</li></ol>
+      <div class="disclaimer">본 결과는 의사결정 지원용이며, 실제 정비는 담당자 현장 확인과 관련 기준에 따릅니다.</div>
+      <button class="action secondary" onclick="showPage('maintain')">추천 화면 이동</button>`;
+  } else {
+    panel.innerHTML = `<h3>5단계. 보고서 생성</h3>
+      <p>분석 요약을 HTML 보고서로 저장할 수 있습니다.</p>
+      <button class="action" onclick="downloadReport()">보고서 다운로드</button>
+      <p class="muted" style="margin-top:10px">시연 완료. 좌측 메뉴에서 각 화면을 자유롭게 탐색하세요.</p>`;
+  }
+}
+
+function downloadReport() {
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>예방정비 분석 보고서</title>
+  <style>body{font-family:Malgun Gothic,sans-serif;max-width:800px;margin:40px auto;line-height:1.6} .warn{background:#fff7ed;padding:10px;border:1px solid #fdba74}</style></head>
+  <body>
+  <div class="warn">가상 시연 데이터 기반 보고서입니다.</div>
+  <h1>AI 기반 공공시설 예방정비 분석 보고서</h1>
+  <p>작성일: 2026-11-08</p>
+  ${$('#reportPreview').innerHTML}
+  </body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '공공시설_예방정비_분석보고서_시연.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// events
+$all('.nav-btn').forEach(btn=>btn.addEventListener('click', ()=>showPage(btn.dataset.page)));
+$('#facilitySearch').addEventListener('input', renderFacilityTable);
+$('#facilityTypeFilter').addEventListener('change', renderFacilityTable);
+$('#maintainSelect').addEventListener('change', e=>renderRecommend(e.target.value));
+$('#genPlanBtn').addEventListener('click', ()=>{
+  const name = $('#maintainSelect').value;
+  if (!PLANS.find(p=>p.name===name)) {
+    PLANS.unshift({name, risk:RECOMMEND[name].risk, date:'2026-11-20', status:'점검 필요'});
+    renderPlans();
+  }
+  alert('정비계획에 추가되었습니다. (시연용: 브라우저 세션 내 유지)');
+});
+$('#downloadReportBtn').addEventListener('click', downloadReport);
+$('#runRiskBtn').addEventListener('click', ()=>{
+  alert('위험도 분석을 실행했습니다. (가상 데이터 기준 재계산 완료)');
+  showRiskDetail(FACILITIES[0]);
+});
+$('#riskTable').addEventListener('click', e=>{
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  const f = FACILITIES.find(x=>x.id===tr.dataset.id);
+  if (f) showRiskDetail(f);
+});
+$('#demoPrev').addEventListener('click', ()=>{ demoStep=Math.max(1,demoStep-1); renderDemo(); });
+$('#demoNext').addEventListener('click', ()=>{ demoStep=Math.min(5,demoStep+1); renderDemo(); });
+
+renderTables();
+initCharts();
+renderDemo();
+showRiskDetail(FACILITIES[0]);
+</script>
+</body>
+</html>
